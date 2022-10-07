@@ -1,4 +1,4 @@
-const yargs = require('yargs')
+const yargs = require('yargs');
 const path = require('path');
 const fs = require('fs');
 
@@ -62,7 +62,7 @@ function sorter(src) {
           if(err) throw err
 
           if(stat.isDirectory()) {
-            sorter(currentPath)
+            sorter(currentPath);
           } else {
             createDir(config.dist, () => {
               const firstLetter = path.basename(currentPath, '.*')[0];
@@ -96,28 +96,43 @@ function deleteFolder(src) {
             if(err) throw err
           })
         } else {
-          deleteFolder(currentPath)
+          deleteFolder(currentPath);
 
-          fs.rm(src, {recursive: true,}, (error) => {
-            if (error) {
-              console.log(error);
-            }
+          fs.rm(src, {recursive: true,}, (err) => {
+            if(err) throw err
           });
         }
       })
     })
   })
-
 }
 
-sorter(config.entry)
-
-if(config.isDelete) {
+function checkExistFolder() {
   if(config.thisFolder === 'src') {
-    deleteFolder(config.entry)
-  } else {
-    deleteFolder(config.dist)
+    if(fs.existsSync(config.entry)) {
+      deleteFolder(config.entry);
+
+      console.log('Папка удалена!');
+    } else {
+      console.log('Папка не существует');
+    }
   }
 
-  console.log('Папка удалена!')
+  if(config.thisFolder === 'dist') {
+    if(fs.existsSync(config.dist)) {
+      deleteFolder(config.dist);
+
+      console.log('Папка удалена!');
+    } else {
+      console.log('Папка не существует');
+    }
+  }
 }
+
+if(config.isDelete && config.thisFolder === 'src' || config.thisFolder === 'dist') {
+  checkExistFolder();
+} else if(config.isDelete) {
+  console.log('Чтобы удалить папку нужно дописать -r и выбрать папку, которую хотите удалить');
+}
+
+sorter(config.entry);
