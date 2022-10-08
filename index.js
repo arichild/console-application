@@ -112,9 +112,9 @@ function checkExistFolder() {
     if(fs.existsSync(config.entry)) {
       deleteFolder(config.entry);
 
-      console.log('Папка удалена!');
+      console.log('Папка src удалена!');
     } else {
-      console.log('Папка не существует');
+      console.log('Папки src не существует');
     }
   }
 
@@ -122,9 +122,9 @@ function checkExistFolder() {
     if(fs.existsSync(config.dist)) {
       deleteFolder(config.dist);
 
-      console.log('Папка удалена!');
+      console.log('Папка dist удалена!');
     } else {
-      console.log('Папка не существует');
+      console.log('Папки dist не существует');
     }
   }
 }
