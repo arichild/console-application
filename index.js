@@ -1,6 +1,9 @@
 const yargs = require('yargs');
 const path = require('path');
+const util = require("util");
 const fs = require('fs');
+
+const readdir = util.promisify(fs.readdir);
 
 const argv = yargs
   .usage('Usage: node $0 [option]')
@@ -50,32 +53,30 @@ function createDir(src, cb) {
   }
 }
 
-function sorter(src) {
+async function sorter(src) {
   if(!config.isDelete) {
-    fs.readdir(src, (err, files) => {
-      if(err) throw err
+    const files = await readdir(src);
 
-      files.forEach((file) => {
-        const currentPath = path.resolve(src, file);
+    files.forEach((file) => {
+      const currentPath = path.resolve(src, file);
 
-        fs.stat(currentPath, (err, stat) => {
-          if(err) throw err
+      fs.stat(currentPath, (err, stat) => {
+        if(err) throw err
 
-          if(stat.isDirectory()) {
-            sorter(currentPath);
-          } else {
-            createDir(config.dist, () => {
-              const firstLetter = path.basename(currentPath, '.*')[0];
-              const innerPath = path.resolve(config.dist, firstLetter.toUpperCase());
+        if(stat.isDirectory()) {
+          sorter(currentPath);
+        } else {
+          createDir(config.dist, () => {
+            const firstLetter = path.basename(currentPath, '.*')[0];
+            const innerPath = path.resolve(config.dist, firstLetter.toUpperCase());
 
-              createDir(innerPath, () => {
-                fs.copyFile(currentPath, path.resolve(innerPath, path.basename(currentPath)), (err) => {
-                  if(err) throw err
-                })
+            createDir(innerPath, () => {
+              fs.copyFile(currentPath, path.resolve(innerPath, path.basename(currentPath)), (err) => {
+                if(err) throw err
               })
             })
-          }
-        })
+          })
+        }
       })
     })
   }
