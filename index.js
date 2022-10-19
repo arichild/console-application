@@ -2,8 +2,7 @@ const yargs = require('yargs');
 const path = require('path');
 const util = require("util");
 const fs = require('fs');
-
-const readdir = util.promisify(fs.readdir);
+const { mkdir, readdir, stats, copyFile, rm } = require('./modules/fs')
 
 const argv = yargs
   .usage('Usage: node $0 [option]')
@@ -38,18 +37,10 @@ const config = {
   entry: path.normalize(path.resolve(__dirname, argv.entry)),
   dist: path.normalize(path.resolve(__dirname, argv.dist)),
   isDelete: argv.delete,
-  thisFolder: argv.removeFolder
-}
-
-function createDir(src, cb) {
-  if(!fs.existsSync(src)) {
-    fs.mkdir(src, (err) => {
-      if(err) throw err
-    })
-
-    cb()
-  } else {
-    cb()
+  thisFolder: function() {
+    if(argv.delete) {
+      return path.normalize(path.resolve(__dirname, argv.removeFolder))
+    }
   }
 }
 
@@ -57,83 +48,55 @@ async function sorter(src) {
   if(!config.isDelete) {
     const files = await readdir(src);
 
-    files.forEach((file) => {
+    for(const file of files) {
       const currentPath = path.resolve(src, file);
+      const stat = await stats(currentPath);
 
-      fs.stat(currentPath, (err, stat) => {
-        if(err) throw err
+      if(stat.isDirectory()) {
+        await sorter(currentPath)
+      } else {
+        const firstLetter = path.basename(currentPath, '.*')[0];
+        const innerPath = path.resolve(config.dist, firstLetter.toUpperCase());
+        const newPath = path.resolve(innerPath, path.basename(currentPath));
 
-        if(stat.isDirectory()) {
-          sorter(currentPath);
-        } else {
-          createDir(config.dist, () => {
-            const firstLetter = path.basename(currentPath, '.*')[0];
-            const innerPath = path.resolve(config.dist, firstLetter.toUpperCase());
-
-            createDir(innerPath, () => {
-              fs.copyFile(currentPath, path.resolve(innerPath, path.basename(currentPath)), (err) => {
-                if(err) throw err
-              })
-            })
-          })
-        }
-      })
-    })
-  }
-}
-
-function deleteFolder(src) {
-  fs.readdir(src, (err, files) => {
-    if(err) throw err
-
-    files.forEach((file) => {
-      let currentPath = path.resolve(src, file);
-
-      fs.stat(currentPath, (err, stat) => {
-        if(err) throw err
-
-        if(!stat.isDirectory()) {
-          fs.unlink(currentPath, err => {
-            if(err) throw err
-          })
-        } else {
-          deleteFolder(currentPath);
-
-          fs.rm(src, {recursive: true,}, (err) => {
-            if(err) throw err
-          });
-        }
-      })
-    })
-  })
-}
-
-function checkExistFolder() {
-  if(config.thisFolder === 'src') {
-    if(fs.existsSync(config.entry)) {
-      deleteFolder(config.entry);
-
-      console.log('Папка src удалена!');
-    } else {
-      console.log('Папки src не существует');
-    }
-  }
-
-  if(config.thisFolder === 'dist') {
-    if(fs.existsSync(config.dist)) {
-      deleteFolder(config.dist);
-
-      console.log('Папка dist удалена!');
-    } else {
-      console.log('Папки dist не существует');
+        await mkdir(config.dist)
+        await mkdir(innerPath)
+        await copyFile(currentPath, newPath)
+      }
     }
   }
 }
 
-if(config.isDelete && config.thisFolder === 'src' || config.thisFolder === 'dist') {
-  checkExistFolder();
-} else if(config.isDelete) {
-  console.log('Чтобы удалить папку нужно дописать -r и выбрать папку, которую хотите удалить');
+(async function() {
+  try {
+    await sorter(config.entry)
+  } catch (err) {
+    console.log(err)
+  }
+}())
+
+async function deleteFolder(src) {
+  await rm(src)
 }
 
-sorter(config.entry);
+async function checkExistFolder() {
+  if(fs.existsSync(config.thisFolder())) {
+    await deleteFolder(config.thisFolder());
+
+    console.log(`Папка ${argv.removeFolder} удалена!`);
+  } else {
+    console.log(`Папки ${argv.removeFolder} не существует`);
+  }
+}
+
+(async function() {
+  try {
+    if(config.isDelete && config.thisFolder()) {
+      await checkExistFolder();
+    } else if(config.isDelete) {
+      console.log('Чтобы удалить папку нужно дописать -r и выбрать папку, которую хотите удалить');
+    }
+  } catch(err) {
+    console.log(err)
+  }
+}())
